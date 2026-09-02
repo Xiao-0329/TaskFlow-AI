@@ -1,0 +1,36 @@
+# TaskFlow AI 一键部署
+#
+# 用法：
+#   1. cp .env.example .env   （按需修改）
+#   2. docker compose up -d
+#   3. 打开 http://localhost:8600
+#
+# LLM 说明：默认连接宿主机的 Ollama（host.docker.internal:11434）。
+#   - 宿主机需先安装 Ollama 并拉取模型：ollama pull qwen3:4b
+#   - 或改用云 API（见 .env.example 的 openai 通道配置）
+
+services:
+  taskflow:
+    build: ./backend
+    container_name: taskflow-ai
+    ports:
+      - "8600:8600"
+    volumes:
+      - taskflow-data:/app/data
+    environment:
+      # ---- LLM 通道：mock | ollama | openai ----
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
+      # ---- ollama 通道 ----
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen3:4b}
+      # ---- openai 兼容云 API 通道（LLM_PROVIDER=openai 时生效）----
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com/v1}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-chat}
+      - LLM_TIMEOUT=${LLM_TIMEOUT:-180}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Linux 宿主机兼容
+    restart: unless-stopped
+
+volumes:
+  taskflow-data:

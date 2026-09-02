@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskFlow AI —— AI 任务分配系统</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- ================= 登录页 ================= -->
+<div id="login-view" class="login-wrap hidden">
+  <div class="login-card">
+    <div class="login-logo">TaskFlow <span class="accent">AI</span></div>
+    <div class="login-sub">AI 任务分配系统</div>
+    <form id="login-form">
+      <input id="login-username" placeholder="用户名或姓名" autocomplete="username" required>
+      <input id="login-password" type="password" placeholder="密码" autocomplete="current-password" required>
+      <div id="login-error" class="login-error hidden"></div>
+      <button type="submit" class="btn primary" style="width:100%">登 录</button>
+    </form>
+    <div class="login-hint">演示账号：admin / admin123（管理员）、张工 / 123456（员工）</div>
+  </div>
+</div>
+
+<!-- ================= 主应用 ================= -->
+<div id="app-view" class="hidden">
+<header>
+  <div class="brand">TaskFlow <span class="accent">AI</span></div>
+
+  <!-- 管理员导航 -->
+  <nav id="tabs-admin" class="hidden">
+    <button data-tab="employees" class="active">👥 员工画像</button>
+    <button data-tab="projects">📁 项目</button>
+    <button data-tab="review">🔍 拆解审核</button>
+    <button data-tab="pool">📋 任务池</button>
+    <button data-tab="workbench">📝 执行与评估</button>
+    <button data-tab="attendance">🕐 考勤与排班</button>
+  </nav>
+
+  <!-- 员工导航 -->
+  <nav id="tabs-employee" class="hidden">
+    <button data-tab="my-tasks" class="active">📌 我的任务</button>
+    <button data-tab="my-records">🗂 我的记录</button>
+    <button data-tab="my-profile">📊 我的画像</button>
+  </nav>
+
+  <div id="user-box" class="user-box"></div>
+  <div id="llm-badge" class="badge">…</div>
+</header>
+
+<main>
+  <!-- ============ 管理员：员工画像 ============ -->
+  <section id="tab-employees" class="tab admin-tab">
+    <div class="panel">
+      <h3>录入员工</h3>
+      <form id="employee-form" class="form-row">
+        <input name="name" placeholder="姓名 *" required>
+        <input name="role" placeholder="岗位（如：后端开发）">
+        <input name="skills" placeholder="技能标签，逗号分隔（如：python, api）">
+        <input name="username" placeholder="登录名（默认=姓名）">
+        <input name="password" placeholder="密码（默认 123456）">
+        <button type="submit" class="btn primary">添加</button>
+      </form>
+    </div>
+    <div class="panel">
+      <h3>员工画像 <span class="hint">能力分由评估引擎 EMA 更新；难度上限 = 建议分配的最高任务难度</span></h3>
+      <table id="employee-table">
+        <thead><tr>
+          <th>姓名</th><th>岗位</th><th>技能</th><th>能力分</th>
+          <th>难度上限</th><th>当前负载</th><th>已评估</th><th>请假</th><th></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 管理员：项目 ============ -->
+  <section id="tab-projects" class="tab admin-tab">
+    <div class="panel">
+      <h3>录入项目（公司业务的大型任务）</h3>
+      <form id="project-form" class="form-col">
+        <input name="name" placeholder="项目名称 *" required>
+        <input name="goal" placeholder="项目目的（拆解质量的关键输入）*">
+        <div class="form-row">
+          <select name="industry" id="industry-select" title="行业包影响拆解方式、评分侧重和派发容量"></select>
+        </div>
+        <div id="industry-desc" class="hint"></div>
+        <textarea name="description" placeholder="项目描述：背景、范围、约束、交付要求…"></textarea>
+        <button type="submit" class="btn primary">创建项目</button>
+      </form>
+    </div>
+    <div class="panel">
+      <h3>项目列表</h3>
+      <table id="project-table">
+        <thead><tr>
+          <th>ID</th><th>项目</th><th>行业</th><th>草稿</th><th>待分配</th><th>已完成</th><th>操作</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 管理员：拆解审核 ============ -->
+  <section id="tab-review" class="tab admin-tab">
+    <div class="panel">
+      <h3>LLM 拆解结果审核 <span class="hint">AI 提案、人拍板：通过后任务才进入分配池</span></h3>
+      <div id="review-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ 管理员：任务池 ============ -->
+  <section id="tab-pool" class="tab admin-tab">
+    <div class="panel">
+      <h3>已审核任务池 <span class="hint">点击「分配」查看系统推荐的人选及理由</span></h3>
+      <table id="pool-table">
+        <thead><tr>
+          <th>任务</th><th>项目</th><th>难度</th><th>工时</th><th>技能</th><th>状态</th><th>操作</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 管理员：执行与评估 ============ -->
+  <section id="tab-workbench" class="tab admin-tab">
+    <div class="panel">
+      <h3>进行中的任务 <span class="hint">员工在自己界面提交交付物；管理员在此触发评估</span></h3>
+      <table id="workbench-table">
+        <thead><tr>
+          <th>任务</th><th>指派给</th><th>难度</th><th>预估工时</th><th>验收标准</th><th>状态</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>提交记录与评估结果</h3>
+      <div id="submission-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ 管理员：考勤与排班 ============ -->
+  <section id="tab-attendance" class="tab admin-tab">
+    <div class="panel">
+      <h3>今日考勤 <span class="hint">员工上班打卡后任务自动派发；休息日打卡会标记为加班</span></h3>
+      <table id="attendance-table">
+        <thead><tr>
+          <th>姓名</th><th>岗位</th><th>排班模式</th><th>今日排班</th><th>上班打卡</th><th>下班打卡</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>排班日历（未来 14 天） <span class="hint">点击排班模式可切换：标准工作日 / 上二休二</span></h3>
+      <div id="schedule-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ 员工：我的任务 ============ -->
+  <section id="tab-my-tasks" class="tab employee-tab">
+    <div class="panel" id="clock-panel"></div>
+    <div class="panel">
+      <h3>今日任务 <span class="hint">上班打卡自动领取；下班前提交交付物</span></h3>
+      <div id="mytasks-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ 员工：我的记录 ============ -->
+  <section id="tab-my-records" class="tab employee-tab">
+    <div class="panel">
+      <h3>我的提交与评估反馈</h3>
+      <div id="myrecords-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ 员工：我的画像 ============ -->
+  <section id="tab-my-profile" class="tab employee-tab">
+    <div class="panel" id="myprofile-box"></div>
+  </section>
+</main>
+</div>
+
+<!-- 弹窗 -->
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head"><span id="modal-title"></span><button id="modal-close" class="btn ghost">✕</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
