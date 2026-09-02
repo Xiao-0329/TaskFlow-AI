@@ -1,0 +1,182 @@
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --text: #1a1d24;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --brand: #4b3fe3;
+  --brand-soft: #f0efff;
+  --danger: #e8463a;
+  --success: #1dc981;
+  --warning: #efaa17;
+  --radius: 10px;
+}
+* { box-sizing: border-box; }
+.hidden { display: none !important; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.6 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+header {
+  display: flex; align-items: center; gap: 20px;
+  background: var(--surface); padding: 12px 24px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+}
+.brand { font-size: 18px; font-weight: 700; }
+.brand .accent { color: var(--brand); }
+nav { display: flex; gap: 4px; flex: 1; }
+nav button {
+  border: none; background: none; padding: 8px 14px; cursor: pointer;
+  font-size: 14px; color: var(--muted); border-radius: 8px;
+}
+nav button.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+nav button:hover { color: var(--brand); }
+.badge {
+  font-size: 12px; color: var(--muted); background: var(--bg);
+  border: 1px solid var(--border); padding: 4px 10px; border-radius: 999px;
+}
+main { max-width: 1200px; margin: 20px auto; padding: 0 24px; }
+.tab { display: none; }
+.tab.active { display: block; }
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 20px;
+}
+h3 { margin: 0 0 14px; font-size: 15px; }
+.hint { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 8px; }
+
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.form-col { display: flex; flex-direction: column; gap: 10px; }
+input, textarea, select {
+  border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+  font: inherit; background: var(--surface); color: var(--text);
+}
+textarea { min-height: 80px; resize: vertical; }
+.form-row input { flex: 1; min-width: 160px; }
+
+.btn {
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+  padding: 7px 14px; border-radius: 8px; cursor: pointer; font: inherit;
+}
+.btn:hover { border-color: var(--brand); color: var(--brand); }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn.primary:hover { opacity: 0.9; color: #fff; }
+.btn.danger { color: var(--danger); }
+.btn.danger:hover { border-color: var(--danger); }
+.btn.ghost { border: none; }
+.btn.small { padding: 4px 10px; font-size: 12px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+
+.tag {
+  display: inline-block; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 999px; padding: 1px 8px; font-size: 12px; margin: 1px 3px 1px 0;
+}
+.tag.brand { background: var(--brand-soft); border-color: transparent; color: var(--brand); }
+
+.score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.bar {
+  height: 6px; border-radius: 3px; background: var(--border);
+  width: 80px; display: inline-block; vertical-align: middle; margin-right: 6px;
+}
+.bar > span { display: block; height: 100%; border-radius: 3px; background: var(--brand); }
+
+.card {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px; margin-bottom: 12px; background: var(--surface);
+}
+.card .card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card .meta { color: var(--muted); font-size: 12px; margin: 6px 0; }
+.card .actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.cand { border-left: 3px solid var(--brand); }
+.cand .reasons { font-size: 12px; color: var(--muted); }
+
+.eval-box { border-top: 1px dashed var(--border); margin-top: 10px; padding-top: 10px; }
+.eval-box .fb { color: var(--muted); font-size: 13px; }
+
+.modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.modal.hidden { display: none; }
+.modal-box {
+  background: var(--surface); border-radius: 12px; padding: 20px;
+  width: min(640px, 92vw); max-height: 86vh; overflow: auto;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-weight: 600; }
+.modal-box input, .modal-box textarea, .modal-box select { width: 100%; margin-bottom: 8px; }
+.modal-box label { font-size: 12px; color: var(--muted); display: block; margin: 8px 0 4px; }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: #fff; padding: 10px 20px;
+  border-radius: 999px; font-size: 13px; z-index: 200; transition: opacity .3s;
+}
+.toast.hidden { opacity: 0; pointer-events: none; }
+.empty { color: var(--muted); text-align: center; padding: 30px 0; }
+.status-pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+.st-draft { background: #fff7e6; color: #92600a; }
+.st-pending { background: var(--brand-soft); color: var(--brand); }
+.st-assigned { background: #e8f4ff; color: #1668b3; }
+.st-submitted { background: #f3e8ff; color: #7c3aed; }
+.st-reviewed { background: #e7f9f0; color: #0f766e; }
+
+/* 登录页 */
+.login-wrap {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #f5f6f8 0%, #eceaff 100%); z-index: 50;
+}
+.login-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  padding: 36px 32px; width: min(380px, 92vw); box-shadow: 0 12px 40px rgba(75, 63, 227, .08);
+}
+.login-logo { font-size: 24px; font-weight: 700; text-align: center; }
+.login-sub { color: var(--muted); text-align: center; margin: 6px 0 24px; font-size: 13px; }
+.login-card form { display: flex; flex-direction: column; gap: 10px; }
+.login-card input { padding: 11px 14px; }
+.login-error { color: var(--danger); font-size: 13px; }
+.login-hint { margin-top: 16px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.7; }
+.user-box { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+
+/* 员工画像页 */
+.profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.profile-item {
+  border: 1px solid var(--border); border-radius: 10px; padding: 16px;
+  background: var(--bg);
+}
+.profile-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.profile-value { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.profile-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* 打卡面板 */
+.clock-row { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.clock-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* 排班日历 */
+.cal-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.cal-cell {
+  width: 62px; border-radius: 8px; padding: 8px 4px; text-align: center;
+  border: 1px solid var(--border);
+}
+.cal-on { background: var(--brand-soft); border-color: transparent; }
+.cal-on .cal-date, .cal-on .cal-day { color: var(--brand); }
+.cal-off { background: var(--bg); }
+.cal-date { font-size: 13px; font-weight: 600; }
+.cal-day { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+/* 阶段进度 */
+.phase-row { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-top: 6px; }
+.phase-chip {
+  font-size: 11px; padding: 1px 8px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--border); color: var(--muted);
+}
+.phase-chip.ph-active { background: var(--brand-soft); border-color: transparent; color: var(--brand); }
+.phase-chip.ph-done { background: #e7f9f0; border-color: transparent; color: #0f766e; }
+.phase-arrow { color: var(--border); font-size: 11px; margin: 0 2px; }
+
+/* 行业包标签 */
+.tag.ind-knowledge { background: var(--brand-soft); border-color: transparent; color: var(--brand); }
+.tag.ind-production { background: #fff7e6; border-color: transparent; color: #92600a; }
+.tag.ind-response { background: #e8f4ff; border-color: transparent; color: #1668b3; }
