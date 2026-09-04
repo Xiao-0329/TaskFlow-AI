@@ -120,12 +120,81 @@ async function refreshAll() {
   if (!state.user) return;
   try {
     if (state.user.role === 'admin') {
-      await Promise.all([loadEmployees(), loadProjects(), loadReview(), loadPool(), loadWorkbench(), loadAttendance()]);
+      await Promise.all([loadDashboard(), loadEmployees(), loadProjects(), loadReview(), loadPool(), loadWorkbench(), loadAttendance()]);
     } else {
       await Promise.all([loadClockPanel(), loadMyTasks(), loadMyRecords(), loadMyProfile()]);
     }
   } catch (e) { console.error(e); }
 }
+
+// ================================================================ 管理员：总览仪表盘
+async function loadDashboard() {
+  const ov = await api('/overview');
+
+  // 团队负载
+  const tb = $('#load-table tbody');
+  tb.innerHTML = ov.loads.map(l => {
+    const pct = Math.min(100, l.utilization);
+    const barColor = l.utilization > 100 ? 'var(--danger)' : l.utilization >= 80 ? 'var(--warning)' : 'var(--brand)';
+    return `
+    <tr>
+      <td><b>${esc(l.name)}</b></td>
+      <td>${esc(l.role)}</td>
+      <td>${l.load_hours}h / ${l.capacity}h</td>
+      <td><span class="bar" style="width:100px"><span style="width:${pct}%;background:${barColor}"></span></span> <span class="score">${l.utilization}%</span></td>
+      <td>${l.active_tasks}</td>
+      <td>${l.overdue_count ? `<span class="status-pill st-draft">${l.overdue_count}</span>` : '0'}</td>
+      <td style="max-width:220px;font-size:12px">${(l.projects || []).map(esc).join('、') || '—'}</td>
+      <td>${l.on_leave ? '<span class="status-pill st-draft">请假</span>' : '<span class="status-pill st-reviewed">在岗</span>'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">暂无员工</td></tr>';
+
+  // 僵尸任务
+  const stale = ov.stale_tasks || [];
+  $('#stale-list').innerHTML = stale.length ? stale.map(s => `
+    <div class="card" style="border-left:3px solid var(--danger)">
+      <b>${esc(s.title)}</b> → ${esc(s.assigned_to)}
+      <span class="meta">分配于 ${s.assigned_at.replace('T', ' ').slice(0, 16)}，${s.est_hours}h</span>
+      <span class="tag" style="background:#fdecea;color:var(--danger)">占用容量中</span>
+    </div>`).join('') : '<div class="empty">没有超时未提交的任务</div>';
+
+  // 项目紧急度
+  $('#urgency-list').innerHTML = (ov.projects || []).map(p => {
+    const u = p.urgency;
+    const color = u >= 80 ? 'var(--danger)' : u >= 50 ? 'var(--warning)' : 'var(--brand)';
+    return `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span class="bar" style="width:120px"><span style="width:${u}%;background:${color}"></span></span>
+      <span class="score">${u}</span>
+      <b>${esc(p.name)}</b>
+      <span class="tag">${p.deadline ? `截止 ${p.deadline}` : '无截止日期'}</span>
+      <span class="meta">${p.pending} 待分配 · ${p.done} 已完成</span>
+    </div>`;
+  }).join('') || '<div class="empty">暂无进行中的项目</div>';
+
+  // 全局任务池
+  const pt = $('#global-pool-table tbody');
+  pt.innerHTML = (ov.pool || []).map((t, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td><b>${esc(t.title)}</b>${t.phase ? `<div style="font-size:12px;color:var(--brand)">🏷 ${esc(t.phase)}</div>` : ''}</td>
+      <td>${esc(t.project)}</td>
+      <td>${t.project_deadline || '—'}</td>
+      <td><span class="score">${t.urgency}</span></td>
+      <td>${esc(t.priority)}</td>
+      <td>D${t.difficulty}</td>
+      <td>${t.est_hours}h</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="empty">任务池为空</td></tr>';
+}
+
+window.recycleStale = async () => {
+  if (!confirm('回收所有超时未提交的任务？回收后释放对应员工的容量，任务重新进入任务池。')) return;
+  try {
+    const r = await api('/recycle-stale', { method: 'POST' });
+    toast(`已回收 ${r.recycled} 个僵尸任务`);
+    refreshAll();
+  } catch (err) { toast(err.message, false); }
+};
 
 // ================================================================ 管理员：员工
 async function loadEmployees() {
@@ -221,7 +290,7 @@ async function loadProjects() {
     <tr>
       <td>${p.id}</td>
       <td><b>${esc(p.name)}</b><div style="color:var(--muted);font-size:12px">${esc(p.goal)}</div>${phaseHtml}</td>
-      <td><span class="tag ind-${esc(p.industry)}">${esc(p.industry_name || p.industry)}</span></td>
+      <td><span class="tag ind-${esc(p.industry)}">${esc(p.industry_name || p.industry)}</span>${p.deadline ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">⏰ ${esc(p.deadline)}</div>` : ''}</td>
       <td>${p.task_draft}</td>
       <td>${p.task_pending}</td>
       <td>${p.task_done}</td>

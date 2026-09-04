@@ -1,13 +1,16 @@
 """自动派发引擎：员工上班打卡后，按约束自动从任务池领取当日任务。
 
 派发规则（按序过滤）：
+  0. 先回收本人的僵尸任务（超时未提交自动回池，释放容量）
   1. 任务池中已审核、未分配的任务
   2. 依赖满足：depends_on 引用的任务（同项目按标题匹配）已全部完成
   3. 难度不超员工能力上限（难度爬坡）
   4. 技能匹配：员工技能与任务技能标签有交集（任务无技能要求则直接通过）
-  5. 按优先级排序，逐个领取直到当日工时容量满
+  5. 按全局优先级排序（项目紧急度 × 任务优先级 × 难度），逐个领取直到容量满
+
+多项目统筹：排序与容量都是跨项目视角；全局视图见 services/scheduler.overview()。
 """
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -15,6 +18,7 @@ from .. import models
 from ..industry import get_pack
 from .evaluate import suggest_difficulty_cap
 from .schedule import DAILY_CAPACITY_HOURS
+from .scheduler import global_sort_key, recycle_stale_tasks
 
 PRIORITY_ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 
@@ -42,9 +46,13 @@ def auto_dispatch(db: Session, employee: models.Employee) -> list[models.Task]:
     """上班打卡后自动派发当日任务。返回本次新分配的任务列表。
 
     行业包影响容量：响应型（客服/运维/护理）只排 60% 工时，预留事件处理容量。
+    全局统筹：派发前先回收本人僵尸任务；任务按全局紧急度排序。
     """
     if employee.on_leave:
         return []
+
+    # 0. 回收本人的僵尸任务（超时占容量的元凶）
+    recycle_stale_tasks(db)
 
     cap = suggest_difficulty_cap(employee.capability)
     emp_skills = {s.lower() for s in (employee.skills or [])}
@@ -55,7 +63,7 @@ def auto_dispatch(db: Session, employee: models.Employee) -> list[models.Task]:
         .all()
     )
 
-    # 已有进行中的任务也计入当日容量
+    # 已有进行中的任务也计入当日容量（跨项目合计）
     current = (
         db.query(models.Task)
         .filter(models.Task.assigned_employee_id == employee.id,
@@ -75,7 +83,8 @@ def auto_dispatch(db: Session, employee: models.Employee) -> list[models.Task]:
             continue
         candidates.append(t)
 
-    candidates.sort(key=lambda t: (PRIORITY_ORDER.get(t.priority, 9), -t.difficulty))
+    # 全局排序：项目紧急度（deadline 临近优先）→ 任务优先级 → 难度
+    candidates.sort(key=global_sort_key)
 
     assigned = []
     for t in candidates:
@@ -85,6 +94,7 @@ def auto_dispatch(db: Session, employee: models.Employee) -> list[models.Task]:
             continue
         t.assigned_employee_id = employee.id
         t.status = "assigned"
+        t.assigned_at = datetime.now()  # 僵尸回收的时间依据
         assigned.append(t)
         load_hours += t.est_hours
         if load_hours >= DAILY_CAPACITY_HOURS:
@@ -96,7 +106,8 @@ def auto_dispatch(db: Session, employee: models.Employee) -> list[models.Task]:
 
 
 def daily_summary(db: Session, employee: models.Employee) -> dict:
-    """下班打卡时的当日汇总（看当天处于进行中/已提交/已完成的任务）。"""
+    """下班打卡时的当日汇总：今天分到/提交的任务（按分配时间，跨项目）。"""
+    today = date.today()
     tasks = (
         db.query(models.Task)
         .filter(
@@ -105,8 +116,10 @@ def daily_summary(db: Session, employee: models.Employee) -> dict:
         )
         .all()
     )
-    today = date.today()
-    todays = [t for t in tasks if t.due_date == today] or tasks
+    # 今日口径：assigned_at 是今天的任务；没有时间信息的（旧数据）则计入全部在途
+    todays = [t for t in tasks if t.assigned_at and t.assigned_at.date() == today]
+    if not todays:
+        todays = tasks
 
     unsubmitted = [t.title for t in todays if t.status == "assigned"]
     submitted = [t for t in todays if t.status in ("submitted", "reviewed")]

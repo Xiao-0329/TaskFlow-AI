@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TaskFlow AI —— AI 任务分配系统</title>
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=8">
 </head>
 <body>
 
@@ -30,7 +30,8 @@
 
   <!-- 管理员导航 -->
   <nav id="tabs-admin" class="hidden">
-    <button data-tab="employees" class="active">👥 员工画像</button>
+    <button data-tab="dashboard">📊 总览</button>
+    <button data-tab="employees">👥 员工画像</button>
     <button data-tab="projects">📁 项目</button>
     <button data-tab="review">🔍 拆解审核</button>
     <button data-tab="pool">📋 任务池</button>
@@ -50,6 +51,38 @@
 </header>
 
 <main>
+  <!-- ============ 管理员：总览仪表盘 ============ -->
+  <section id="tab-dashboard" class="tab admin-tab active">
+    <div class="panel">
+      <h3>团队负载 <span class="hint">跨项目合计工时 ÷ 容量；超载排前面</span></h3>
+      <table id="load-table">
+        <thead><tr>
+          <th>姓名</th><th>岗位</th><th>负载/容量</th><th>利用率</th><th>在途任务</th><th>逾期</th><th>参与项目</th><th>状态</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h3>僵尸任务预警 <span class="hint">分配超 2 天未提交，自动占用员工容量</span>
+        <button class="btn small danger" onclick="recycleStale()" style="margin-left:8px">♻ 立即回收</button>
+      </h3>
+      <div id="stale-list"></div>
+    </div>
+    <div class="panel">
+      <h3>项目紧急度 <span class="hint">deadline 临近的项目优先派发</span></h3>
+      <div id="urgency-list"></div>
+    </div>
+    <div class="panel">
+      <h3>全局任务池 <span class="hint">按 项目紧急度 × 任务优先级 排序，即打卡自动派发的领取顺序</span></h3>
+      <table id="global-pool-table">
+        <thead><tr>
+          <th>#</th><th>任务</th><th>项目</th><th>项目截止</th><th>紧急度</th><th>优先级</th><th>难度</th><th>工时</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- ============ 管理员：员工画像 ============ -->
   <section id="tab-employees" class="tab admin-tab">
     <div class="panel">
@@ -84,6 +117,7 @@
         <input name="goal" placeholder="项目目的（拆解质量的关键输入）*">
         <div class="form-row">
           <select name="industry" id="industry-select" title="行业包影响拆解方式、评分侧重和派发容量"></select>
+          <input name="deadline" type="date" title="项目截止日期（可选）：截止越近，其任务在全局派发中越优先">
         </div>
         <div id="industry-desc" class="hint"></div>
         <textarea name="description" placeholder="项目描述：背景、范围、约束、交付要求…"></textarea>

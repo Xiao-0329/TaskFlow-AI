@@ -52,6 +52,7 @@ class Project(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     goal: Mapped[str] = mapped_column(Text, default="")                # 项目目的（拆解的关键输入）
     industry: Mapped[str] = mapped_column(String(16), default="knowledge")  # 行业包：knowledge|production|response
+    deadline: Mapped[date | None] = mapped_column(Date, nullable=True)  # 项目截止日期（全局优先级用）
     status: Mapped[str] = mapped_column(String(16), default="active")  # active | done
     # 滚动拆解：里程碑计划 [{title, goal, scope_hint, est_days}]
     milestones: Mapped[list] = mapped_column(JSON, default=list)
@@ -81,6 +82,7 @@ class Task(Base):
     # --- 流程状态 ---
     review_status: Mapped[str] = mapped_column(String(16), default="draft", index=True)  # draft|approved|rejected
     status: Mapped[str] = mapped_column(String(16), default="pending", index=True)       # pending|assigned|submitted|reviewed
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # 分配时间（僵尸任务回收依据）
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

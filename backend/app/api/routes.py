@@ -17,7 +17,7 @@ from ..auth import admin_required, get_current_user, hash_password, make_token
 from ..db import get_db
 from ..industry import get_pack, list_packs
 from ..llm import gateway
-from ..services import decompose, evaluate, assign
+from ..services import decompose, evaluate, assign, scheduler
 from . import webhooks
 
 public = APIRouter(prefix="/api")
@@ -138,6 +138,7 @@ class ProjectIn(BaseModel):
     goal: str = ""
     description: str = ""
     industry: str = "knowledge"  # knowledge | production | response
+    deadline: str | None = None  # YYYY-MM-DD（可选，全局优先级用）
 
 
 @admin.get("/projects")
@@ -149,6 +150,7 @@ def list_projects(db: Session = Depends(get_db)):
             "id": p.id, "name": p.name, "goal": p.goal, "description": p.description,
             "status": p.status, "industry": p.industry,
             "industry_name": get_pack(p.industry).name,
+            "deadline": p.deadline.isoformat() if p.deadline else None,
             "task_total": len(tasks),
             "task_draft": sum(1 for t in tasks if t.review_status == "draft"),
             "task_pending": sum(1 for t in tasks if t.review_status == "approved" and t.status == "pending"),
@@ -163,7 +165,17 @@ def list_projects(db: Session = Depends(get_db)):
 def create_project(data: ProjectIn, db: Session = Depends(get_db)):
     if data.industry not in ("knowledge", "production", "response"):
         raise HTTPException(400, "industry 必须是 knowledge / production / response 之一")
-    p = models.Project(name=data.name, goal=data.goal, description=data.description, industry=data.industry)
+    deadline = None
+    if data.deadline:
+        try:
+            from datetime import date as _date
+            deadline = _date.fromisoformat(data.deadline)
+        except ValueError:
+            raise HTTPException(400, "deadline 格式应为 YYYY-MM-DD")
+    p = models.Project(
+        name=data.name, goal=data.goal, description=data.description,
+        industry=data.industry, deadline=deadline,
+    )
     db.add(p)
     db.commit()
     db.refresh(p)
@@ -340,8 +352,27 @@ def assign_task(task_id: int, employee_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "员工不存在")
     t.assigned_employee_id = employee_id
     t.status = "assigned"
+    from datetime import datetime as _dt
+    t.assigned_at = _dt.now()  # 僵尸回收的时间依据
     db.commit()
     return {"ok": True}
+
+
+# ================================================================ 全局统筹（管理员）
+@admin.get("/overview")
+def get_overview(db: Session = Depends(get_db)):
+    """全局总览：员工负载、任务池全局排序、项目紧急度、僵尸任务预警。"""
+    return scheduler.overview(db)
+
+
+@admin.post("/recycle-stale")
+def recycle_stale(db: Session = Depends(get_db)):
+    """手动触发僵尸任务回收（超时未提交的任务回池）。"""
+    zombies = scheduler.recycle_stale_tasks(db)
+    return {
+        "recycled": len(zombies),
+        "tasks": [{"id": t.id, "title": t.title} for t in zombies],
+    }
 
 
 # ================================================================ 提交与评估（管理员查看/触发）

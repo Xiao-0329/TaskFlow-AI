@@ -45,11 +45,15 @@ def _migrate_sqlite() -> None:
         task_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(tasks)"))]
         if "phase" not in task_cols:
             conn.execute(text("ALTER TABLE tasks ADD COLUMN phase VARCHAR(200) DEFAULT ''"))
+        if "assigned_at" not in task_cols:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN assigned_at DATETIME"))
         proj_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(projects)"))]
         if "milestones" not in proj_cols:
             conn.execute(text("ALTER TABLE projects ADD COLUMN milestones JSON"))
         if "industry" not in proj_cols:
             conn.execute(text("ALTER TABLE projects ADD COLUMN industry VARCHAR(16) DEFAULT 'knowledge'"))
+        if "deadline" not in proj_cols:
+            conn.execute(text("ALTER TABLE projects ADD COLUMN deadline DATE"))
         ev_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(evaluations)"))]
         if "criterion_scores" not in ev_cols:
             conn.execute(text("ALTER TABLE evaluations ADD COLUMN criterion_scores JSON"))
