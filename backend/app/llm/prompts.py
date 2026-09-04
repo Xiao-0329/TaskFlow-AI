@@ -49,15 +49,27 @@ MILESTONE_SCHEMA = {
     "required": ["milestones"],
 }
 
-# 评估输出的 JSON Schema
+# 评估输出的 JSON Schema（含逐条验收标准判定）
 EVAL_SCHEMA = {
     "type": "object",
     "properties": {
+        "criteria": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "criterion": {"type": "string"},
+                    "verdict": {"type": "string", "enum": ["pass", "partial", "fail"]},
+                    "comment": {"type": "string"},
+                },
+                "required": ["criterion", "verdict", "comment"],
+            },
+        },
         "quality_score": {"type": "integer"},
         "efficiency_score": {"type": "integer"},
         "feedback": {"type": "string"},
     },
-    "required": ["quality_score", "efficiency_score", "feedback"],
+    "required": ["criteria", "quality_score", "efficiency_score", "feedback"],
 }
 
 
@@ -151,16 +163,25 @@ EVALUATE_SYSTEM = """你是一位严格但公正的工作质量评审专家。�
 
 你必须输出严格的 JSON，不要输出任何其他文字。输出结构：
 {
+  "criteria": [
+    {
+      "criterion": "验收标准原文（照抄任务里的每条 acceptance）",
+      "verdict": "pass | partial | fail 之一",
+      "comment": "针对这条标准的判定依据：交付物中的哪部分证据支持/不支持"
+    }
+  ],
   "quality_score": 0-100 的整数,
   "efficiency_score": 0-100 的整数,
-  "feedback": "评估反馈，必须具体：哪条验收标准达成/未达成、好在哪、差在哪、下次怎么改进"
+  "feedback": "总体反馈：好在哪、差在哪、下次怎么改进（100字内）"
 }
 
 评分规则：
-- quality_score：逐条对照任务的验收标准（acceptance）和交付物要求评分。全部达成且质量高=90+；基本达成=70-89；部分达成=50-69；未达成或敷衍=<50
+- criteria 数组：任务有几条验收标准就有几条，一条不能少，criterion 字段照抄原文
+- verdict 判定：完全达成=pass；部分达成或存疑=partial；未达成=fail；comment 必须引用交付物中的具体证据
+- quality_score：全部 pass=90+；多数 pass 少量 partial=70-89；有 fail=50-69；多数 fail 或敷衍=<50
 - efficiency_score：结合预估工时与员工自报耗时评估。提前且质量达标=90+；按期=70-89；超时=<70（若质量极高可适当上调）
 - feedback 必须可解释、可执行，不能只说"做得不错"
-- 提交内容明显敷衍（如内容过短、答非所问）时大幅扣分并明确指出"""
+- 提交内容明显敷衍（如内容过短、答非所问）时全部 fail 并大幅扣分"""
 
 
 def evaluate_user(

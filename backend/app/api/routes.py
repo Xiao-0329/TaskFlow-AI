@@ -18,6 +18,7 @@ from ..db import get_db
 from ..industry import get_pack, list_packs
 from ..llm import gateway
 from ..services import decompose, evaluate, assign
+from . import webhooks
 
 public = APIRouter(prefix="/api")
 admin = APIRouter(prefix="/api", dependencies=[Depends(admin_required)])
@@ -77,10 +78,17 @@ def list_employees(db: Session = Depends(get_db)):
             "capability": e.capability, "task_count": e.task_count,
             "current_load": e.current_load, "on_leave": e.on_leave,
             "username": e.username,
+            "external_ids": e.external_ids or {},
             "difficulty_cap": evaluate.suggest_difficulty_cap(e.capability),
         }
         for e in db.query(models.Employee).filter(models.Employee.is_admin.is_(False)).all()
     ]
+
+
+@admin.put("/employees/{employee_id}/external-id")
+def set_external_id(employee_id: int, data: webhooks.ExternalIdIn, db: Session = Depends(get_db)):
+    """绑定员工的外部考勤账号（飞书/钉钉/企微 userId），供 webhook 事件匹配。"""
+    return webhooks.bind_external_id(db, employee_id, data.platform, data.external_id)
 
 
 @admin.post("/employees")
@@ -337,21 +345,29 @@ def assign_task(task_id: int, employee_id: int, db: Session = Depends(get_db)):
 
 
 # ================================================================ 提交与评估（管理员查看/触发）
+def _evaluation_out(ev: models.Evaluation | None) -> dict | None:
+    """评估结果统一序列化（含逐条明细与防作弊标记）。"""
+    if not ev:
+        return None
+    return {
+        "quality_score": ev.quality_score,
+        "efficiency_score": ev.efficiency_score,
+        "total_score": ev.total_score,
+        "feedback": ev.feedback,
+        "criteria": ev.criterion_scores or [],
+        "flags": ev.flags or [],
+    }
+
+
 @admin.get("/submissions")
 def list_submissions(db: Session = Depends(get_db)):
     result = []
     for s in db.query(models.Submission).order_by(models.Submission.id.desc()).all():
-        ev = s.evaluation
         result.append({
             "id": s.id, "task_id": s.task_id, "task_title": s.task.title,
             "employee": s.employee.name, "content": s.content,
             "spent_hours": s.spent_hours, "submitted_at": s.submitted_at.isoformat(),
-            "evaluation": {
-                "quality_score": ev.quality_score,
-                "efficiency_score": ev.efficiency_score,
-                "total_score": ev.total_score,
-                "feedback": ev.feedback,
-            } if ev else None,
+            "evaluation": _evaluation_out(s.evaluation),
         })
     return result
 
@@ -368,12 +384,7 @@ def evaluate_submission_api(submission_id: int, db: Session = Depends(get_db)):
         ev = evaluate.evaluate_submission(db, s)
     except gateway.LLMError as e:
         raise HTTPException(502, f"LLM 评估失败: {e}")
-    return {
-        "quality_score": ev.quality_score,
-        "efficiency_score": ev.efficiency_score,
-        "total_score": ev.total_score,
-        "feedback": ev.feedback,
-    }
+    return _evaluation_out(ev)
 
 
 # ================================================================ 员工自助
@@ -414,17 +425,11 @@ def my_submissions(user: models.Employee = Depends(get_current_user), db: Sessio
         .order_by(models.Submission.id.desc())
         .all()
     ):
-        ev = s.evaluation
         result.append({
             "id": s.id, "task_id": s.task_id, "task_title": s.task.title,
             "content": s.content, "spent_hours": s.spent_hours,
             "submitted_at": s.submitted_at.isoformat(),
-            "evaluation": {
-                "quality_score": ev.quality_score,
-                "efficiency_score": ev.efficiency_score,
-                "total_score": ev.total_score,
-                "feedback": ev.feedback,
-            } if ev else None,
+            "evaluation": _evaluation_out(s.evaluation),
         })
     return result
 

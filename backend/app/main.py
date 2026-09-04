@@ -8,13 +8,14 @@ from sqlalchemy import text
 from . import models  # noqa: F401
 from .auth import hash_password
 from .db import engine, SessionLocal
-from .api import routes, attendance
+from .api import routes, attendance, webhooks
 
-app = FastAPI(title="TaskFlow AI —— AI 任务分配系统", version="0.3.0")
+app = FastAPI(title="TaskFlow AI —— AI 任务分配系统", version="0.7.0")
 app.include_router(routes.public)
 app.include_router(routes.admin)
 app.include_router(routes.me)
 app.include_router(attendance.router)
+app.include_router(webhooks.router)
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -39,6 +40,8 @@ def _migrate_sqlite() -> None:
             conn.execute(text("ALTER TABLE employees ADD COLUMN work_pattern VARCHAR(16) DEFAULT 'standard'"))
         if "schedule_anchor" not in cols:
             conn.execute(text("ALTER TABLE employees ADD COLUMN schedule_anchor DATE"))
+        if "external_ids" not in cols:
+            conn.execute(text("ALTER TABLE employees ADD COLUMN external_ids JSON"))
         task_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(tasks)"))]
         if "phase" not in task_cols:
             conn.execute(text("ALTER TABLE tasks ADD COLUMN phase VARCHAR(200) DEFAULT ''"))
@@ -47,6 +50,11 @@ def _migrate_sqlite() -> None:
             conn.execute(text("ALTER TABLE projects ADD COLUMN milestones JSON"))
         if "industry" not in proj_cols:
             conn.execute(text("ALTER TABLE projects ADD COLUMN industry VARCHAR(16) DEFAULT 'knowledge'"))
+        ev_cols = [r[1] for r in conn.execute(text("PRAGMA table_info(evaluations)"))]
+        if "criterion_scores" not in ev_cols:
+            conn.execute(text("ALTER TABLE evaluations ADD COLUMN criterion_scores JSON"))
+        if "flags" not in ev_cols:
+            conn.execute(text("ALTER TABLE evaluations ADD COLUMN flags JSON"))
         conn.commit()
 
 

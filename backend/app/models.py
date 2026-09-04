@@ -32,6 +32,8 @@ class Employee(Base):
     # --- 排班 ---
     work_pattern: Mapped[str] = mapped_column(String(16), default="standard")   # standard=工作日 | 2on2off=上二休二
     schedule_anchor: Mapped[date | None] = mapped_column(Date, nullable=True)   # 上二休二周期锚点（首个工作日）
+    # --- 考勤平台用户映射：{"feishu": "ou_xxx", "dingtalk": "xxx", "wecom": "xxx"} ---
+    external_ids: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     tasks: Mapped[list["Task"]] = relationship(back_populates="assigned_employee")
@@ -111,6 +113,10 @@ class Evaluation(Base):
     efficiency_score: Mapped[float] = mapped_column(Float, default=0)  # 效率 0-100
     total_score: Mapped[float] = mapped_column(Float, default=0)      # 总分（质量 70% + 效率 30%）
     feedback: Mapped[str] = mapped_column(Text, default="")             # 可解释反馈（必须给理由）
+    # 逐条验收标准判定：[{criterion, verdict: pass|partial|fail, comment}]
+    criterion_scores: Mapped[list] = mapped_column(JSON, default=list)
+    # 防作弊标记：过短提交 / 与历史提交重复
+    flags: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     submission: Mapped["Submission"] = relationship(back_populates="evaluation")

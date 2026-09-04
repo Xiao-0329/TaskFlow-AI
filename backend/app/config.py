@@ -24,3 +24,11 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./taskflow.db")
 
 # 请求超时（秒）：本地小模型拆解大项目可能较慢
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "180"))
+
+# ---- 考勤 webhook ----
+# 统一事件 API 的共享密钥（POST /api/webhooks/attendance 请求头 X-Webhook-Secret）
+# 生产环境必须设置，否则该端点拒绝服务
+ATTENDANCE_WEBHOOK_SECRET = os.getenv("ATTENDANCE_WEBHOOK_SECRET", "")
+
+# 飞书事件订阅的 Verification Token（开放平台-事件订阅配置页获取）
+FEISHU_VERIFICATION_TOKEN = os.getenv("FEISHU_VERIFICATION_TOKEN", "")

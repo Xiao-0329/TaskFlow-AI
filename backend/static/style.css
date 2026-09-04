@@ -180,3 +180,19 @@ th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .tag.ind-knowledge { background: var(--brand-soft); border-color: transparent; color: var(--brand); }
 .tag.ind-production { background: #fff7e6; border-color: transparent; color: #92600a; }
 .tag.ind-response { background: #e8f4ff; border-color: transparent; color: #1668b3; }
+
+/* 评估逐条明细 */
+.crit-row {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 6px 10px; margin-top: 6px; border-radius: 8px; font-size: 13px;
+}
+.crit-row.vd-pass { background: #e7f9f0; }
+.crit-row.vd-partial { background: #fff7e6; }
+.crit-row.vd-fail { background: #fdecea; }
+.crit-verdict { flex-shrink: 0; }
+.crit-text { font-weight: 500; }
+.crit-comment { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.crit-flag {
+  background: #fdecea; color: var(--danger); border-radius: 8px;
+  padding: 6px 10px; margin-top: 6px; font-size: 13px;
+}

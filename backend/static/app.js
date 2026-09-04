@@ -88,6 +88,23 @@ function statusText(s) {
   return { pending: '待分配', assigned: '进行中', submitted: '已提交', reviewed: '已完成' }[s] || s;
 }
 
+// 评估明细：逐条验收标准判定 + 防作弊标记（管理员/员工端共用）
+function criteriaHtml(ev) {
+  if (!ev) return '';
+  const verdictIcon = { pass: '✅', partial: '⚠️', fail: '❌' };
+  const verdictClass = { pass: 'vd-pass', partial: 'vd-partial', fail: 'vd-fail' };
+  const rows = (ev.criteria || []).map(c => `
+    <div class="crit-row ${verdictClass[c.verdict] || 'vd-partial'}">
+      <span class="crit-verdict">${verdictIcon[c.verdict] || '⚠️'}</span>
+      <div>
+        <div class="crit-text">${esc(c.criterion)}</div>
+        ${c.comment ? `<div class="crit-comment">${esc(c.comment)}</div>` : ''}
+      </div>
+    </div>`).join('');
+  const flags = (ev.flags || []).map(f => `<div class="crit-flag">🚩 ${esc(f)}</div>`).join('');
+  return `${flags}${rows}`;
+}
+
 // ---------------- Tab 切换（管理员与员工共用逻辑） ----------------
 function bindTabs(navEl) {
   $$('button', navEl).forEach(btn => btn.onclick = () => {
@@ -126,10 +143,37 @@ async function loadEmployees() {
       <td>${e.on_leave ? '是' : '否'}</td>
       <td>
         <button class="btn small" onclick="toggleLeave(${e.id}, ${!e.on_leave})">${e.on_leave ? '销假' : '请假'}</button>
+        <button class="btn small" onclick="bindExternalModal(${e.id})">🔗 绑定考勤</button>
         <button class="btn small danger" onclick="delEmployee(${e.id})">删除</button>
       </td>
     </tr>`).join('') || '<tr><td colspan="9" class="empty">暂无员工</td></tr>';
 }
+
+window.bindExternalModal = id => {
+  const e = state.employees.find(x => x.id === id);
+  if (!e) return;
+  const ids = e.external_ids || {};
+  openModal(`绑定考勤账号 —— ${e.name}`, `
+    <label>飞书 user/open_id（考勤事件匹配用）</label>
+    <input id="ext-feishu" value="${esc(ids.feishu || '')}" placeholder="ou_xxxxxxxx">
+    <label>钉钉 userid</label>
+    <input id="ext-dingtalk" value="${esc(ids.dingtalk || '')}" placeholder="钉钉成员 userid">
+    <label>企业微信 userid</label>
+    <input id="ext-wecom" value="${esc(ids.wecom || '')}" placeholder="企微成员 userid">
+    <div class="hint" style="margin:8px 0">在对应平台管理后台可查到成员 ID；绑定后，该平台推送的打卡事件会自动匹配到此员工并触发任务派发。</div>
+    <button class="btn primary" onclick="saveExternal(${id})" style="width:100%">保存绑定</button>
+  `);
+};
+
+window.saveExternal = async id => {
+  const platforms = { feishu: $('#ext-feishu').value.trim(), dingtalk: $('#ext-dingtalk').value.trim(), wecom: $('#ext-wecom').value.trim() };
+  try {
+    for (const [platform, external_id] of Object.entries(platforms)) {
+      await api(`/employees/${id}/external-id`, { method: 'PUT', body: { platform, external_id } });
+    }
+    toast('考勤账号已绑定'); $('#modal').classList.add('hidden'); loadEmployees();
+  } catch (err) { toast(err.message, false); }
+};
 
 window.toggleLeave = async (id, onLeave) => {
   const e = state.employees.find(x => x.id === id);
@@ -398,6 +442,7 @@ async function loadWorkbench() {
           质量 <span class="score">${s.evaluation.quality_score}</span> ·
           效率 <span class="score">${s.evaluation.efficiency_score}</span> ·
           总分 <span class="score" style="color:var(--brand)">${s.evaluation.total_score}</span>
+          ${criteriaHtml(s.evaluation)}
           <div class="fb">${esc(s.evaluation.feedback)}</div>
         </div>` : ''}
     </div>`).join('') || '<div class="empty">暂无提交记录</div>';
@@ -407,7 +452,7 @@ window.doEvaluate = async id => {
   toast('评估引擎运行中…');
   try {
     const ev = await api(`/submissions/${id}/evaluate`, { method: 'POST' });
-    toast(`评估完成：总分 ${ev.total_score}`);
+    toast(`评估完成：总分 ${ev.total_score}${(ev.flags || []).length ? '（含可疑标记）' : ''}`);
     loadWorkbench(); loadEmployees();
   } catch (err) { toast('评估失败: ' + err.message, false); }
 };
@@ -562,6 +607,7 @@ async function loadMyRecords() {
           质量 <span class="score">${s.evaluation.quality_score}</span> ·
           效率 <span class="score">${s.evaluation.efficiency_score}</span> ·
           总分 <span class="score" style="color:var(--brand)">${s.evaluation.total_score}</span>
+          ${criteriaHtml(s.evaluation)}
           <div class="fb">${esc(s.evaluation.feedback)}</div>
         </div>` : ''}
     </div>`).join('') || '<div class="empty">暂无提交记录</div>';

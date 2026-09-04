@@ -28,6 +28,9 @@ services:
       - LLM_API_KEY=${LLM_API_KEY:-}
       - LLM_MODEL=${LLM_MODEL:-deepseek-chat}
       - LLM_TIMEOUT=${LLM_TIMEOUT:-180}
+      # ---- 考勤 webhook ----
+      - ATTENDANCE_WEBHOOK_SECRET=${ATTENDANCE_WEBHOOK_SECRET:-}
+      - FEISHU_VERIFICATION_TOKEN=${FEISHU_VERIFICATION_TOKEN:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"   # Linux 宿主机兼容
     restart: unless-stopped

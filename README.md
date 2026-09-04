@@ -7,6 +7,8 @@
 - **滚动拆解**：LLM 先规划里程碑，再逐阶段拆成天级任务；前序阶段消化完才拆下一阶段
 - **行业包**：知识型 / 生产型 / 响应型三套预设（拆解提示、评分权重、派发容量），适配不同行业
 - **打卡事件驱动**：上班打卡自动领取当日任务（技能×难度爬坡×依赖×容量）；下班打卡生成当日汇总
+- **评估可解释**：AI 按验收标准逐条判定（✅/⚠️/❌）并给出依据；防作弊检测（敷衍/重复提交自动标记）
+- **考勤系统对接**：webhook 接收飞书/钉钉打卡事件；提供统一事件 API，任何考勤系统都能对接
 - **排班约束**：标准工作日 / 上二休二
 - **角色分离**：管理员端（项目/审核/分配/评估/考勤）与员工端（我的任务/记录/画像）
 - **LLM 可插拔**：本地 Ollama（数据不出内网）/ OpenAI 兼容云 API / 演示 mock，改配置即切换
@@ -44,6 +46,29 @@ docker compose up -d
 | 本地模型 | `ollama` | 默认。企业数据不出内网 |
 | 云 API | `openai` | 兼容 DeepSeek / GLM / GPT 等，配 `LLM_BASE_URL` + `LLM_API_KEY` |
 | 演示 | `mock` | 无需模型，跑通流程用 |
+
+## 考勤系统对接
+
+系统通过 webhook 接收打卡事件，员工上班打卡即自动领取当日任务。
+
+**前置**：管理端「员工画像 → 🔗 绑定考勤」里给每个员工填平台成员 ID（飞书 ou_xxx / 钉钉 userid / 企微 userid）。
+
+| 对接方式 | 端点 | 说明 |
+|---|---|---|
+| 飞书事件订阅 | `POST /api/webhooks/feishu` | 开放平台订阅考勤打卡事件；需公网可达 |
+| 钉钉事件回调 | `POST /api/webhooks/dingtalk` | HTTP 回调模式 |
+| **统一事件 API** | `POST /api/webhooks/attendance` | 任何系统都能对接（含企微，可用脚本转发） |
+
+统一事件 API 示例（需设置环境变量 `ATTENDANCE_WEBHOOK_SECRET`）：
+
+```bash
+curl -X POST https://your-host/api/webhooks/attendance \
+  -H "Content-Type: application/json" \
+  -H "X-Webhook-Secret: <你的密钥>" \
+  -d '{"source":"wecom","external_id":"zhang_san","type":"in"}'
+```
+
+> 企业微信回调需 AES 消息解密，暂未内置适配器；用上面的统一 API 由企业侧脚本转发即可（webhook 端点返回 `{"matched": true, "employee": "..."}`）。
 
 ## 典型使用流程
 
